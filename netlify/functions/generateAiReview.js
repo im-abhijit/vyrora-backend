@@ -1,5 +1,4 @@
 import admin from "firebase-admin";
-import { GoogleGenAI, Type } from "@google/genai";
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -12,7 +11,6 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 async function generateReviewFromIngredients(ingredients) {
   const prompt = `You are a skincare expert.
@@ -31,25 +29,35 @@ Ingredients: ${JSON.stringify(ingredients)}`;
     throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const model = process.env.GEMINI_MODEL || "gemini-3-pro-preview";
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-      },
-    },
-  });
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
+      }),
+    }
+  );
 
-  const text =
-    typeof response?.text === "string"
-      ? response.text
-      : typeof response?.text === "function"
-      ? response.text()
-      : "";
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Gemini API error (${response.status}): ${errorText || "Unknown error"}`
+    );
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!text) {
     throw new Error("Gemini API returned empty response.");
