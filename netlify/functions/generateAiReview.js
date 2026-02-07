@@ -14,7 +14,7 @@ const db = admin.firestore();
 
 async function generateReviewFromIngredients(ingredients) {
   const prompt = `You are a skincare expert.
-Based on the following ingredient list, generate 3 short bullet point one liner which a common men can understand review insights.
+Based on the following ingredient list, generate 3 short bullet point one liner max 10-12 words which a common men can understand review insights.
 Focus on:
 
 * benefits (according to product if its hhair product then hair benefits if its a body product then body benefits if its a skin product then skin benefits)
