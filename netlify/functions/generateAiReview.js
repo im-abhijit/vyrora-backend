@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { GoogleGenAI, Type } from "@google/genai";
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -11,6 +12,7 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 async function generateReviewFromIngredients(ingredients) {
   const prompt = `You are a skincare expert.
@@ -25,31 +27,29 @@ Return ONLY a JSON array of strings.
 
 Ingredients: ${JSON.stringify(ingredients)}`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Gemini API error (${response.status}): ${errorText || "Unknown error"}`
-    );
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const model = process.env.GEMINI_MODEL || "gemini-3-pro-preview";
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+      },
+    },
+  });
+
+  const text =
+    typeof response?.text === "string"
+      ? response.text
+      : typeof response?.text === "function"
+      ? response.text()
+      : "";
 
   if (!text) {
     throw new Error("Gemini API returned empty response.");
@@ -57,7 +57,7 @@ Ingredients: ${JSON.stringify(ingredients)}`;
 
   let parsed;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(String(text).trim());
   } catch (error) {
     throw new Error(`Failed to parse Gemini response: ${text}`);
   }

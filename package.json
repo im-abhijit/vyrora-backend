@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@google/genai": "latest",
     "firebase-admin": "latest"
   }
 }
