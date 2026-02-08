@@ -78,9 +78,19 @@ Ingredients: ${JSON.stringify(ingredients)}`;
 }
 
 export async function handler(event) {
+  const headers = {
+    "Access-Control-Allow-Origin": "http://localhost:3000",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers };
+  }
+
   try {
     if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method Not Allowed" };
+      return { statusCode: 405, headers, body: "Method Not Allowed" };
     }
 
     const body = event.body ? JSON.parse(event.body) : {};
@@ -89,6 +99,7 @@ export async function handler(event) {
     if (!productId1 || !productId2) {
       return {
         statusCode: 400,
+        headers,
         body: "productId1 and productId2 are required",
       };
     }
@@ -113,6 +124,7 @@ export async function handler(event) {
 
     return {
       statusCode: 200,
+      headers,
       body: JSON.stringify({
         productId1: review1,
         productId2: review2,
@@ -121,6 +133,7 @@ export async function handler(event) {
   } catch (error) {
     return {
       statusCode: 500,
+      headers,
       body: error.message,
     };
   }
