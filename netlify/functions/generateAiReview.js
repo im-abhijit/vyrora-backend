@@ -13,65 +13,58 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 async function generateReviewFromIngredients(ingredients) {
-  const prompt = `You are a skincare expert.
-Based on the following ingredient list, generate 3 short bullet point one liner max 10-12 words which a common men can understand review insights.
-Focus on:
-
-* benefits (according to product if its hhair product then hair benefits if its a body product then body benefits if its a skin product then skin benefits)
-* suitability for oily/dry/acne skin
-* active ingredients impact
-* possible irritation risks
+  const prompt = `Skincare expert. Generate 3 short review bullets (10-12 words).
+Cover benefits, skin-type suitability, actives impact, irritation risk.
 Return ONLY a JSON array of strings.
-
 Ingredients: ${JSON.stringify(ingredients)}`;
 
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("Missing GEMINI_API_KEY");
+  if (!process.env.XAI_API_KEY) {
+    throw new Error("Missing XAI_API_KEY");
   }
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
+  const model = process.env.GROK_MODEL || "grok-4";
+  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      temperature: 0.7,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
         },
-      }),
-    }
-  );
+      ],
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `Gemini API error (${response.status}): ${errorText || "Unknown error"}`
+      `Grok API error (${response.status}): ${errorText || "Unknown error"}`
     );
   }
 
   const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = data?.choices?.[0]?.message?.content;
 
   if (!text) {
-    throw new Error("Gemini API returned empty response.");
+    throw new Error("Grok API returned empty response.");
   }
 
   let parsed;
   try {
     parsed = JSON.parse(String(text).trim());
   } catch (error) {
-    throw new Error(`Failed to parse Gemini response: ${text}`);
+    throw new Error(`Failed to parse Grok response: ${text}`);
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error("Gemini response is not a JSON array.");
+    throw new Error("Grok response is not a JSON array.");
   }
 
   return parsed.map((item) => String(item));
