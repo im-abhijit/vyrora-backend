@@ -118,16 +118,22 @@ export async function handler(event) {
     ]);
 
     await Promise.all([
-      db.collection("products").doc(productId1).update({ ai_review: review1 }),
-      db.collection("products").doc(productId2).update({ ai_review: review2 }),
+      db
+        .collection("products")
+        .doc(productId1)
+        .set({ ai_review: review1 }, { merge: true }),
+      db
+        .collection("products")
+        .doc(productId2)
+        .set({ ai_review: review2 }, { merge: true }),
     ]);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        productId1: review1,
-        productId2: review2,
+        [productId1]: review1,
+        [productId2]: review2,
       }),
     };
   } catch (error) {
