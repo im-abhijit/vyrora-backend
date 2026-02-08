@@ -102,24 +102,44 @@ export async function handler(event) {
       db.collection("products").doc(productId2).get(),
     ]);
 
-    const ingredients1 = doc1.exists ? doc1.data()?.ingredients || [] : [];
-    const ingredients2 = doc2.exists ? doc2.data()?.ingredients || [] : [];
+    const data1 = doc1.exists ? doc1.data() : null;
+    const data2 = doc2.exists ? doc2.data() : null;
+    const existingReview1 = Array.isArray(data1?.ai_review)
+      ? data1.ai_review
+      : null;
+    const existingReview2 = Array.isArray(data2?.ai_review)
+      ? data2.ai_review
+      : null;
+
+    const ingredients1 = data1?.ingredients || [];
+    const ingredients2 = data2?.ingredients || [];
 
     const [review1, review2] = await Promise.all([
-      generateReviewFromIngredients(ingredients1),
-      generateReviewFromIngredients(ingredients2),
+      existingReview1 ?? generateReviewFromIngredients(ingredients1),
+      existingReview2 ?? generateReviewFromIngredients(ingredients2),
     ]);
 
-    await Promise.all([
-      db
-        .collection("products")
-        .doc(productId1)
-        .set({ ai_review: review1 }, { merge: true }),
-      db
-        .collection("products")
-        .doc(productId2)
-        .set({ ai_review: review2 }, { merge: true }),
-    ]);
+    const updates = [];
+    if (!existingReview1) {
+      updates.push(
+        db
+          .collection("products")
+          .doc(productId1)
+          .set({ ai_review: review1 }, { merge: true })
+      );
+    }
+    if (!existingReview2) {
+      updates.push(
+        db
+          .collection("products")
+          .doc(productId2)
+          .set({ ai_review: review2 }, { merge: true })
+      );
+    }
+
+    if (updates.length) {
+      await Promise.all(updates);
+    }
 
     return {
       statusCode: 200,
